@@ -2,12 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -36,6 +40,8 @@ func Chain(f http.HandlerFunc, middleswares ...Middleware) http.HandlerFunc {
 
 var db *gorm.DB
 
+var templates *template.Template
+
 func main() {
 	log.Print("Starting go-shit")
 	log.Print("Connecting to db...")
@@ -49,6 +55,20 @@ func main() {
 	db.AutoMigrate(&shit.Shit{})
 	log.Print("Done!")
 
+	var allFiles []string
+	files, err := ioutil.ReadDir("./templates")
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, file := range files {
+		filename := file.Name()
+		if strings.HasSuffix(filename, ".html") {
+			allFiles = append(allFiles, "./templates/"+filename)
+		}
+	}
+
+	templates, err = template.ParseFiles(allFiles...) //parses all .tmpl files in the 'templates' folder
+
 	log.Print("Setting up routes...")
 	r := mux.NewRouter()
 	log.Print("Setting up /shit router...")
@@ -61,8 +81,26 @@ func main() {
 	shitrouter.HandleFunc("/{id}", Chain(DeleteShit, Logging())).Methods("DELETE")
 	shitrouter.HandleFunc("/{id}", Chain(UpdateShit, Logging())).Methods("PUT")
 
+	r.HandleFunc("/", Chain(Index, Logging())).Methods("GET")
+
+	fs := http.FileServer(http.Dir("static/"))
+
+	staticPrefix := r.PathPrefix("/static/")
+	staticPrefix.Handler(http.StripPrefix("/static/", fs))
+
 	log.Print("Shit is now ready to serve!")
 	http.ListenAndServe(":8080", r)
+}
+
+func Index(w http.ResponseWriter, r *http.Request) {
+	allShits := []shit.Shit{}
+	db.Find(&allShits)
+
+	data := map[string]interface{}{
+		"shits": allShits,
+	}
+
+	templates.Lookup("index.html").Execute(w, data)
 }
 
 func GetAllShits(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +127,6 @@ func DeleteShit(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	db.Delete(&shit.Shit{}, id)
-
 }
 
 func CreateShit(w http.ResponseWriter, r *http.Request) {

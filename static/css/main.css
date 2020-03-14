@@ -1,0 +1,28 @@
+body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    font-family: "Roboto";
+    text-align: center;
+}
+
+main {
+    padding: 64px;
+}
+
+.shit {
+    background: #2F3F4F;
+    color: white;
+    margin-bottom: 20px;
+    padding: 20px 20px;
+    border-radius: 10px;
+    box-shadow: 5px 5px 5px rgba(0,0,0,0.2);
+}
+
+.shit .text {
+    font-size: 20pt;
+}
+
+.shit .timestamp {
+    text-align: right;
+}
