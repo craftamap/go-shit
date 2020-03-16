@@ -1,26 +1,27 @@
-body {
-    width: 100vw;
-    height: 100vh;
+html {
     margin: 0;
+}
+
+body {
     font-family: "Roboto";
     text-align: center;
 }
 
 main {
-    padding: 64px;
+    margin: 64px auto;
+    max-width: 800px;
 }
 
 .shit {
-    background: #2F3F4F;
-    color: white;
     margin-bottom: 20px;
     padding: 20px 20px;
     border-radius: 10px;
     box-shadow: 5px 5px 5px rgba(0,0,0,0.2);
+    border: 1px solid black;
 }
 
 .shit .text {
-    font-size: 20pt;
+    font-size: 14pt;
 }
 
 .shit .timestamp {

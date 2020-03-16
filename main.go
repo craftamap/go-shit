@@ -104,48 +104,87 @@ func Index(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAllShits(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var shits []shit.Shit
 	db.Find(&shits)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(shits)
+	response := shit.Response{
+		Status: shit.Success,
+		Data:   shits,
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 func GetShit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	var shit shit.Shit
-	db.First(&shit, id)
+	var gshit shit.Shit
+	db.First(&gshit, id)
+	if gshit.ID == 0 {
+		json.NewEncoder(w).Encode(shit.Response{
+			Status: shit.Fail,
+			Data:   "Id not found",
+		})
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(shit)
+	json.NewEncoder(w).Encode(shit.Response{Data: gshit})
 }
 
 func DeleteShit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	db.Delete(&shit.Shit{}, id)
+	dshit := shit.Shit{}
+
+	db.Where("ID = ?", id).First(&dshit)
+	if dshit.ID == 0 {
+		json.NewEncoder(w).Encode(shit.Response{
+			Status: shit.Fail,
+			Data:   "Id not found",
+		})
+		return
+	}
+
+	db.Delete(&dshit)
+	json.NewEncoder(w).Encode(shit.Response{
+		Status: shit.Success,
+		Data:   nil,
+	})
 }
 
 func CreateShit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	type AcceptedShit struct {
 		Text string `json:"text"`
 	}
 
 	acShit := AcceptedShit{}
 	err := json.NewDecoder(r.Body).Decode(&acShit)
-	shit := shit.Shit{Text: acShit.Text}
-	shit.Timestamp = time.Now()
 	if err != nil {
-		panic("failed!")
+		json.NewEncoder(w).Encode(shit.Response{
+			Status: shit.Fail,
+			Data:   "Invalid input data",
+		})
+		return
 	}
-	db.Create(&shit)
-	log.Print(shit)
+	cshit := shit.Shit{Text: acShit.Text}
+	cshit.Timestamp = time.Now()
+	db.Create(&cshit)
+
+	json.NewEncoder(w).Encode(shit.Response{
+		Status: shit.Success,
+		Data:   &cshit,
+	})
 }
 
 func UpdateShit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	type AcceptedShit struct {
 		Text string `json:"text"`
 	}
@@ -156,14 +195,24 @@ func UpdateShit(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&acShit)
 	if err != nil {
 		log.Fatal(err)
-		panic("failed!")
+		json.NewEncoder(w).Encode(shit.Response{
+			Status: shit.Fail,
+			Data:   "Invalid input data",
+		})
 	}
 	i, err := strconv.Atoi(id)
 	if err != nil {
-		panic("failed!")
+		json.NewEncoder(w).Encode(shit.Response{
+			Status: shit.Fail,
+			Data:   "Invalid id",
+		})
 	}
 
 	var u_shit shit.Shit
 
 	db.Model(&u_shit).Where(shit.Shit{ID: i}).Updates(shit.Shit{Text: acShit.Text})
+	json.NewEncoder(w).Encode(shit.Response{
+		Status: shit.Success,
+		Data:   &u_shit,
+	})
 }
