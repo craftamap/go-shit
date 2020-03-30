@@ -1,4 +1,4 @@
-package shit
+package dto 
 
 import (
 	"time"
