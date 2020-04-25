@@ -1,3 +1,5 @@
+//go:generate pkger -include /templates -include /static
+
 package main
 
 import (
@@ -6,10 +8,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/markbates/pkger"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -76,34 +80,42 @@ func main() {
 	log.Print("Done!")
 	var count int
 	db.Find(&dto.User{}).Count(&count)
-	if  count == 0 {
-	    log.Print("Found no user! Creating init user admin:admin!")
-	    user := &dto.User{}
-	    user.Username = "admin"
-	    user.SetPasswd("admin")
-	    db.Save(&user)
+	if count == 0 {
+		log.Print("Found no user! Creating init user admin:admin!")
+		user := &dto.User{}
+		user.Username = "admin"
+		user.SetPasswd("admin")
+		db.Save(&user)
 	}
+	templates = template.New("")
 
-	var allFiles []string
-	files, err := ioutil.ReadDir("./templates")
-	if err != nil {
-		fmt.Println(err)
-	}
-	for _, file := range files {
-		filename := file.Name()
-		if strings.HasSuffix(filename, ".html") {
-			allFiles = append(allFiles, "./templates/"+filename)
-		}
-	}
+	dir := pkger.Include("/templates")
 
-	templates, err = template.ParseFiles(allFiles...) //parses all .tmpl files in the 'templates' folder
+	err = pkger.Walk(dir, func(path string, info os.FileInfo, _ error) error {
+	    if info.IsDir() || !strings.HasSuffix(path, ".html") {
+		return nil
+	    }
+
+	    f, err := pkger.Open(path)
+	    if err != nil {
+		fmt.Print(err)
+	    }
+	    sl, err := ioutil.ReadAll(f)
+	    if err != nil {
+		fmt.Print(err)
+	    }
+
+	    templates.Parse(string(sl))
+	    return nil
+	})
+	fmt.Println(templates)
 
 	log.Print("Setting up routes...")
 	r := mux.NewRouter()
 	log.Print("Setting up /shit router...")
 	shitrouter := r.PathPrefix("/shit").Subrouter()
 
-	shitrouter.HandleFunc("/", Chain(GetAllShits, Logging(), Auth())).Methods("GET")
+	shitrouter.HandleFunc("/", Chain(GetAllShits, Logging())).Methods("GET")
 	shitrouter.HandleFunc("/{id}", Chain(GetShit, Logging())).Methods("GET")
 
 	shitrouter.HandleFunc("/", Chain(CreateShit, Logging())).Methods("POST")
@@ -111,8 +123,11 @@ func main() {
 	shitrouter.HandleFunc("/{id}", Chain(UpdateShit, Logging())).Methods("PUT")
 
 	r.HandleFunc("/", Chain(Index, Logging())).Methods("GET")
+	
+	fsdir, _ := pkger.Open("/static")
 
-	fs := http.FileServer(http.Dir("static/"))
+	fs := http.FileServer(fsdir)
+	
 
 	staticPrefix := r.PathPrefix("/static/")
 	staticPrefix.Handler(http.StripPrefix("/static/", fs))
@@ -129,7 +144,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 		"shits": allShits,
 	}
 
-	templates.Lookup("index.html").Execute(w, data)
+	templates.ExecuteTemplate(w, "index", data)
 }
 
 func GetAllShits(w http.ResponseWriter, r *http.Request) {
